@@ -1,0 +1,10 @@
+{
+    "schema_version": "1.0",
+    "event_id": "evt_001",
+    "store_id": "store_001",
+    "camera_id": "cam_001",
+    "event_type": "entry",
+    "timestamp": "2026-10-16T10:30:00Z",
+    "track_id": 17,
+    "source": "computer_vision"
+}
