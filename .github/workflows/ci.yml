@@ -1,0 +1,52 @@
+name: Footfall Cam CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint and Validate Contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install project dependencies
+        run: uv sync --locked
+
+      - name: Check Python linting
+        run: uv run ruff check scripts
+
+      - name: Check Python formatting
+        run: uv run ruff format --check scripts
+
+      - name: Validate Event Contract examples
+        run: uv run python scripts/validate_events.py
+
+      - name: Run pytest
+        run: |
+          if [ -d tests ] && find tests -name 'test_*.py' -print -quit | grep -q .; then
+            uv run pytest -q
+          else
+            echo "No pytest tests found yet. Skipping pytest."
+          fi
