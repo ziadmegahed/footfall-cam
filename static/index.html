@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Footfall Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --surface: #ffffff;
+            --border: #e4e8ee;
+            --text: #1b2430;
+            --muted: #6b7686;
+            --up: #12a05c;
+            --up-soft: #e3f6ec;
+            --down: #e0483e;
+            --down-soft: #fdeceb;
+            --net: #2f6fed;
+            --net-soft: #e8effe;
+            --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+            --grid: rgba(107, 118, 134, .15);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f141b;
+                --surface: #171e27;
+                --border: #263040;
+                --text: #e7ecf3;
+                --muted: #8a96a8;
+                --up: #35c17f;
+                --up-soft: rgba(53, 193, 127, .14);
+                --down: #f06a60;
+                --down-soft: rgba(240, 106, 96, .14);
+                --net: #5b94ff;
+                --net-soft: rgba(91, 148, 255, .14);
+                --shadow: none;
+                --grid: rgba(138, 150, 168, .15);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Header */
+        header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: var(--net);
+            color: #fff;
+            display: grid;
+            place-items: center;
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 17px;
+            font-weight: 650;
+            letter-spacing: -.01em;
+        }
+
+        .brand p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .live {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: var(--up-soft);
+            color: var(--up);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .live .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 1.8s infinite;
+        }
+
+        .live.error {
+            background: var(--down-soft);
+            color: var(--down);
+        }
+
+        .live.error .dot {
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 currentColor;
+                opacity: 1;
+            }
+
+            70% {
+                box-shadow: 0 0 0 6px transparent;
+                opacity: .6;
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 transparent;
+                opacity: 1;
+            }
+        }
+
+        select {
+            appearance: none;
+            background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7686' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 32px 8px 12px;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            max-width: 320px;
+        }
+
+        select:focus {
+            outline: 2px solid var(--net);
+            outline-offset: 1px;
+        }
+
+        /* Layout */
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .banner {
+            display: none;
+            background: var(--down-soft);
+            color: var(--down);
+            border: 1px solid var(--down);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .banner.show {
+            display: block;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            margin: 0 0 12px;
+        }
+
+        .section-title h2 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 650;
+        }
+
+        .section-title span {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        /* KPI cards */
+        .kpis {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: var(--shadow);
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+
+        .kpi .icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            flex: none;
+        }
+
+        .kpi.up .icon {
+            background: var(--up-soft);
+            color: var(--up);
+        }
+
+        .kpi.down .icon {
+            background: var(--down-soft);
+            color: var(--down);
+        }
+
+        .kpi.net .icon {
+            background: var(--net-soft);
+            color: var(--net);
+        }
+
+        .kpi.traffic .icon {
+            background: var(--border);
+            color: var(--muted);
+        }
+
+        .kpi .label {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .kpi .value {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -.02em;
+            line-height: 1.15;
+            margin-top: 2px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .kpi .hint {
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .kpi.net .value.negative {
+            color: var(--down);
+        }
+
+        /* Panels */
+        .grid {
+            display: grid;
+            grid-template-columns: 1.7fr 1fr;
+            gap: 16px;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: var(--shadow);
+            min-width: 0;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .panel-head h3 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 650;
+        }
+
+        .seg {
+            display: inline-flex;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .seg button {
+            background: transparent;
+            border: 0;
+            color: var(--muted);
+            padding: 5px 12px;
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .seg button+button {
+            border-left: 1px solid var(--border);
+        }
+
+        .seg button.active {
+            background: var(--net-soft);
+            color: var(--net);
+            font-weight: 600;
+        }
+
+        .chart-wrap {
+            position: relative;
+            height: 320px;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            color: var(--muted);
+            font-weight: 500;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            padding: 8px 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 10px 6px;
+            border-bottom: 1px solid var(--border);
+            font-variant-numeric: tabular-nums;
+        }
+
+        tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 9px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge.up {
+            background: var(--up-soft);
+            color: var(--up);
+        }
+
+        .badge.down {
+            background: var(--down-soft);
+            color: var(--down);
+        }
+
+        .empty {
+            color: var(--muted);
+            text-align: center;
+            padding: 28px 0;
+        }
+
+        .table-scroll {
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 12px;
+            padding: 8px 0 32px;
+        }
+
+        @media (max-width: 1000px) {
+            .kpis {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 520px) {
+            main {
+                padding: 16px;
+            }
+
+            .kpis {
+                grid-template-columns: 1fr;
+            }
+
+            .header-inner {
+                padding: 12px 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-inner">
+            <div class="brand">
+                <div class="logo">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                </div>
+                <div>
+                    <h1>Footfall Analytics</h1>
+                    <p>People counting dashboard</p>
+                </div>
+            </div>
+            <div class="controls">
+                <div class="live" id="liveBadge"><span class="dot"></span><span id="liveText">Live</span></div>
+                <select id="runSelect" aria-label="Select run"></select>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="banner" id="banner">Unable to reach the API. Retrying automatically...</div>
+
+        <div class="section-title">
+            <h2>Overview</h2>
+            <span id="lastUpdated">Waiting for data...</span>
+        </div>
+
+        <section class="kpis">
+            <div class="kpi up">
+                <div class="icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 19V5" />
+                        <path d="M5 12l7-7 7 7" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="label">People In (Up)</div>
+                    <div class="value" id="up">0</div>
+                    <div class="hint">Crossed upward</div>
+                </div>
+            </div>
+
+            <div class="kpi down">
+                <div class="icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 5v14" />
+                        <path d="M19 12l-7 7-7-7" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="label">People Out (Down)</div>
+                    <div class="value" id="down">0</div>
+                    <div class="hint">Crossed downward</div>
+                </div>
+            </div>
+
+            <div class="kpi net">
+                <div class="icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="label">Net Occupancy</div>
+                    <div class="value" id="total">0</div>
+                    <div class="hint">Up &minus; Down</div>
+                </div>
+            </div>
+
+            <div class="kpi traffic">
+                <div class="icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 3v18h18" />
+                        <path d="M7 14l4-4 4 4 5-6" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="label">Total Traffic</div>
+                    <div class="value" id="traffic">0</div>
+                    <div class="hint">Up + Down crossings</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid">
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>Traffic over time</h3>
+                    <div class="seg" id="bucketSeg">
+                        <button data-b="10" class="active">10s</button>
+                        <button data-b="30">30s</button>
+                        <button data-b="60">1m</button>
+                    </div>
+                </div>
+                <div class="chart-wrap"><canvas id="chart"></canvas></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>Recent events</h3>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Person</th>
+                                <th>Direction</th>
+                                <th>Video time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rows"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>Footfall Analytics &middot; auto-refreshes every 3 seconds</footer>
+
+    <script>
+        const $ = id => document.getElementById(id);
+        const REFRESH_MS = 3000;
+        let chart = null;
+        let bucket = 10;
+
+        const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+        async function get(url) {
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(`${r.status} ${url}`);
+            return r.json();
+        }
+
+        function fmtTime(seconds) {
+            const s = Math.floor(Number(seconds) || 0);
+            const m = Math.floor(s / 60);
+            return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+        }
+
+        function setStatus(ok) {
+            $('banner').classList.toggle('show', !ok);
+            $('liveBadge').classList.toggle('error', !ok);
+            $('liveText').textContent = ok ? 'Live' : 'Offline';
+        }
+
+        async function loadRuns() {
+            const runs = await get('/api/runs');
+            const select = $('runSelect');
+            const previous = select.value;
+            select.innerHTML = runs.length
+                ? runs.map(r => {
+                    const when = (r.started_at || '').replace('T', ' ');
+                    return `<option value="${r.id}">Run #${r.id} · ${r.video} · ${when}</option>`;
+                }).join('')
+                : '<option value="">No runs yet</option>';
+            if (previous && runs.some(r => String(r.id) === previous)) select.value = previous;
+        }
+
+        function renderChart(timeline) {
+            const labels = timeline.map(p => fmtTime(p.t));
+            const data = {
+                labels,
+                datasets: [
+                    {
+                        type: 'line', label: 'Net occupancy', data: timeline.map(p => p.net_cumulative),
+                        borderColor: css('--net'), backgroundColor: css('--net'), borderWidth: 2.5,
+                        tension: 0.3, pointRadius: 2, order: 0
+                    },
+                    {
+                        type: 'bar', label: 'Up', data: timeline.map(p => p.up),
+                        backgroundColor: css('--up'), borderRadius: 4, order: 1
+                    },
+                    {
+                        type: 'bar', label: 'Down', data: timeline.map(p => p.down),
+                        backgroundColor: css('--down'), borderRadius: 4, order: 2
+                    },
+                ],
+            };
+
+            if (!chart) {
+                Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+                chart = new Chart($('chart'), {
+                    data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, color: css('--muted') } },
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false }, ticks: { color: css('--muted') },
+                                title: { display: true, text: 'Video time (mm:ss)', color: css('--muted') }
+                            },
+                            y: {
+                                grid: { color: css('--grid') }, ticks: { color: css('--muted'), precision: 0 },
+                                title: { display: true, text: 'People', color: css('--muted') }
+                            },
+                        },
+                    },
+                });
+            } else {
+                chart.data = data;
+                chart.update('none');
+            }
+        }
+
+        function renderRows(crossings) {
+            $('rows').innerHTML = crossings.length
+                ? crossings.map(c => `
+          <tr>
+            <td>#${c.track_id}</td>
+            <td><span class="badge ${c.direction}">${c.direction === 'up' ? '&uarr; In' : '&darr; Out'}</span></td>
+            <td>${fmtTime(c.video_time_s)}</td>
+          </tr>`).join('')
+                : '<tr><td colspan="3" class="empty">No crossings recorded yet</td></tr>';
+        }
+
+        async function refresh() {
+            const id = $('runSelect').value;
+            if (!id) return;
+            try {
+                const [s, timeline, crossings] = await Promise.all([
+                    get(`/api/runs/${id}/summary`),
+                    get(`/api/runs/${id}/timeline?bucket=${bucket}`),
+                    get(`/api/runs/${id}/crossings?limit=30`),
+                ]);
+
+                $('up').textContent = s.up_count;
+                $('down').textContent = s.down_count;
+                $('traffic').textContent = s.up_count + s.down_count;
+                const total = $('total');
+                total.textContent = s.total_count;
+                total.classList.toggle('negative', s.total_count < 0);
+
+                renderChart(timeline);
+                renderRows(crossings);
+                setStatus(true);
+                $('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+            } catch (err) {
+                console.error(err);
+                setStatus(false);
+            }
+        }
+
+        $('runSelect').addEventListener('change', refresh);
+
+        $('bucketSeg').addEventListener('click', e => {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+            bucket = Number(btn.dataset.b);
+            document.querySelectorAll('#bucketSeg button').forEach(b => b.classList.toggle('active', b === btn));
+            refresh();
+        });
+
+        (async () => {
+            try {
+                await loadRuns();
+                setStatus(true);
+            } catch (err) {
+                console.error(err);
+                setStatus(false);
+            }
+            await refresh();
+            setInterval(async () => {
+                if (document.hidden) return;
+                try { await loadRuns(); } catch (_) { }
+                refresh();
+            }, REFRESH_MS);
+        })();
+    </script>
+</body>
+
+</html>
