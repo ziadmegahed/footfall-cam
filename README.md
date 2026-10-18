@@ -216,6 +216,16 @@ This creates or synchronizes the local project environment using the committed d
 
 If the lockfile does not exist yet, initialize and resolve project dependencies before using `--locked`.
 
+### Run the API
+
+From the repository root, start the FastAPI dashboard and API with:
+
+```bash
+uv run uvicorn app.main:app --app-dir src --reload
+```
+
+Open `http://127.0.0.1:8000` for the dashboard or `http://127.0.0.1:8000/docs` for the API documentation.
+
 ### 4. Run Code Quality Checks
 
 ```bash
